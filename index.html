@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ポモドーロタイマー</title>
+    <style>
+        /* --- 基本設定 --- */
+        :root {
+            --primary-color: #f43f5e; /* 初期: Focus (Rose) */
+            --bg-color: #fff1f2;
+            --text-color: #e11d48;
+            --white: #ffffff;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-400: #9ca3af;
+            --gray-700: #374151;
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* モードごとのテーマカラー定義 */
+        body.mode-focus {
+            --primary-color: #f43f5e; /* Rose-500 */
+            --bg-color: #fff1f2;      /* Rose-50 */
+            --text-color: #e11d48;    /* Rose-600 */
+        }
+        body.mode-short {
+            --primary-color: #14b8a6; /* Teal-500 */
+            --bg-color: #f0fdfa;      /* Teal-50 */
+            --text-color: #0d9488;    /* Teal-600 */
+        }
+        body.mode-long {
+            --primary-color: #6366f1; /* Indigo-500 */
+            --bg-color: #eef2ff;      /* Indigo-50 */
+            --text-color: #4f46e5;    /* Indigo-600 */
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.5s ease;
+            color: var(--gray-700);
+        }
+
+        /* --- コンテナ --- */
+        .app-container {
+            background: rgba(255, 255, 255, 0.95);
+            width: 100%;
+            max-width: 450px;
+            margin: 20px;
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        /* --- ヘッダー --- */
+        .header {
+            padding: 24px;
+            text-align: center;
+            border-bottom: 1px solid var(--gray-100);
+            position: relative;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .sound-btn {
+            position: absolute;
+            right: 24px;
+            top: 28px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--gray-400);
+            transition: color 0.3s;
+        }
+        .sound-btn:hover { color: var(--gray-700); }
+
+        /* --- タブ切り替え --- */
+        .tabs {
+            display: flex;
+            background: var(--gray-50);
+            margin: 16px;
+            padding: 8px;
+            border-radius: 16px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--gray-400);
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .tab-btn.active {
+            background: var(--white);
+            color: var(--gray-700);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .tab-btn svg { width: 18px; height: 18px; }
+
+        /* --- タイマー表示 --- */
+        .timer-section {
+            padding: 40px 0;
+            text-align: center;
+            position: relative;
+        }
+        /* プログレスバー */
+        .progress-bar-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--gray-100);
+        }
+        .progress-bar {
+            height: 100%;
+            background: var(--primary-color);
+            width: 0%;
+            transition: width 1s linear, background-color 0.5s ease;
+        }
+
+        .timer-display {
+            font-size: 5rem;
+            font-weight: 700;
+            color: var(--text-color);
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+            transition: color 0.5s ease;
+        }
+        .timer-status {
+            margin-top: 10px;
+            color: var(--gray-400);
+            font-weight: 500;
+        }
+
+        /* --- コントロールボタン --- */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 32px;
+        }
+        .btn-main {
+            height: 64px;
+            width: 128px;
+            border-radius: 20px;
+            border: none;
+            background: var(--primary-color);
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transition: transform 0.1s, opacity 0.2s, background-color 0.5s ease;
+        }
+        .btn-main:active { transform: scale(0.96); }
+        .btn-main:hover { opacity: 0.9; }
+
+        .btn-reset {
+            height: 64px;
+            width: 64px;
+            border-radius: 20px;
+            border: none;
+            background: var(--gray-100);
+            color: var(--gray-400);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .btn-reset:hover { background: var(--gray-200); }
+        .btn-reset:active { transform: scale(0.96); }
+
+        /* --- タスクリスト --- */
+        .tasks-section {
+            background: var(--gray-50);
+            padding: 24px;
+            border-radius: 24px 24px 0 0; /* 上だけ丸く */
+            min-height: 300px;
+        }
+        .tasks-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            color: var(--gray-700);
+            font-weight: bold;
+        }
+        .task-count {
+            background: var(--gray-200);
+            color: var(--gray-700);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+
+        .task-form {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .task-input {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: none;
+            outline: none;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .task-input:focus {
+            box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.2);
+        }
+        .btn-add {
+            padding: 12px;
+            border-radius: 12px;
+            border: none;
+            background: var(--primary-color);
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.5s ease;
+        }
+
+        .task-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+        .task-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            transition: opacity 0.2s;
+        }
+        .task-item.completed {
+            opacity: 0.6;
+            background: var(--gray-50);
+        }
+        .task-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            overflow: hidden;
+        }
+        .btn-check {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--gray-200);
+            padding: 0;
+            display: flex;
+        }
+        .task-item.completed .btn-check { color: #22c55e; }
+        .task-item:not(.completed) .btn-check:hover { color: var(--primary-color); }
+
+        .task-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .task-item.completed .task-text { text-decoration: line-through; }
+
+        .btn-delete {
+            border: none;
+            background: none;
+            color: var(--gray-200);
+            cursor: pointer;
+            padding: 4px;
+            opacity: 0;
+            transition: opacity 0.2s, color 0.2s;
+        }
+        .task-item:hover .btn-delete { opacity: 1; }
+        .btn-delete:hover { color: #f87171; }
+
+        /* SVG Icons */
+        svg {
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+    </style>
+</head>
+<body class="mode-focus">
+
+    <div class="app-container">
+        <!-- ヘッダー -->
+        <div class="header">
+            <h1>ポモドーロタイマー</h1>
+            <button id="soundToggle" class="sound-btn" title="音のオン/オフ">
+                <!-- SVG Volume 2 -->
+                <svg id="icon-vol-on" width="24" height="24" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                <!-- SVG Volume X (Hidden initially) -->
+                <svg id="icon-vol-off" width="24" height="24" viewBox="0 0 24 24" style="display:none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+            </button>
+        </div>
+
+        <!-- タブ -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchMode('focus')">
+                <svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10 4 10 0 0 0-4-10z"></path><path d="M9.5 8h5"></path><path d="M12 8v8"></path></svg>
+                集中
+            </button>
+            <button class="tab-btn" onclick="switchMode('short')">
+                <svg width="18" height="18" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
+                短休憩
+            </button>
+            <button class="tab-btn" onclick="switchMode('long')">
+                <svg width="18" height="18" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
+                長休憩
+            </button>
+        </div>
+
+        <!-- タイマー -->
+        <div class="timer-section">
+            <div class="progress-bar-bg">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+            <div id="timerDisplay" class="timer-display">25:00</div>
+            <div id="statusText" class="timer-status">準備はいいですか？</div>
+
+            <div class="controls">
+                <button id="mainBtn" class="btn-main" onclick="toggleTimer()">
+                    <svg id="icon-play" width="24" height="24" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    <svg id="icon-pause" width="24" height="24" viewBox="0 0 24 24" style="display:none;"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                    <span id="mainBtnText">開始</span>
+                </button>
+                <button class="btn-reset" onclick="resetTimer()" title="リセット">
+                    <svg width="24" height="24" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- タスク -->
+        <div class="tasks-section">
+            <div class="tasks-header">
+                タスクリスト
+                <span id="taskCount" class="task-count">0</span>
+            </div>
+            
+            <form id="taskForm" class="task-form">
+                <input type="text" id="taskInput" class="task-input" placeholder="何に取り組みますか？" autocomplete="off">
+                <button type="submit" class="btn-add">
+                    <svg width="24" height="24" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+            </form>
+
+            <ul id="taskList" class="task-list">
+                <!-- タスクはJSでここに追加されます -->
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // --- 設定と状態 ---
+        const MODES = {
+            focus: { min: 25, class: 'mode-focus' },
+            short: { min: 5, class: 'mode-short' },
+            long: { min: 15, class: 'mode-long' }
+        };
+
+        let currentMode = 'focus';
+        let timeLeft = MODES.focus.min * 60;
+        let isRunning = false;
+        let timerInterval = null;
+        let tasks = [];
+        let soundEnabled = true;
+
+        // Audio Context (通知音用)
+        let audioCtx = null;
+
+        // --- DOM要素 ---
+        const body = document.body;
+        const display = document.getElementById('timerDisplay');
+        const progressBar = document.getElementById('progressBar');
+        const statusText = document.getElementById('statusText');
+        const mainBtnText = document.getElementById('mainBtnText');
+        const iconPlay = document.getElementById('icon-play');
+        const iconPause = document.getElementById('icon-pause');
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        
+        // --- タイマー機能 ---
+        function updateDisplay() {
+            const m = Math.floor(timeLeft / 60);
+            const s = timeLeft % 60;
+            display.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            
+            // プログレスバー更新
+            const totalSeconds = MODES[currentMode].min * 60;
+            const progress = ((totalSeconds - timeLeft) / totalSeconds) * 100;
+            progressBar.style.width = `${progress}%`;
+        }
+
+        function toggleTimer() {
+            if (isRunning) {
+                // 一時停止
+                clearInterval(timerInterval);
+                isRunning = false;
+                updateButtonState();
+                statusText.textContent = '一時停止中';
+            } else {
+                // 開始
+                // AudioContextの初期化（ブラウザのポリシー対応）
+                initAudio();
+                
+                isRunning = true;
+                updateButtonState();
+                statusText.textContent = currentMode === 'focus' ? '集中しましょう！' : 'リラックスタイム';
+                
+                timerInterval = setInterval(() => {
+                    if (timeLeft > 0) {
+                        timeLeft--;
+                        updateDisplay();
+                    } else {
+                        completeTimer();
+                    }
+                }, 1000);
+            }
+        }
+
+        function completeTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            updateButtonState();
+            statusText.textContent = '終了！';
+            if (soundEnabled) playSound();
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            timeLeft = MODES[currentMode].min * 60;
+            updateDisplay();
+            updateButtonState();
+            statusText.textContent = '準備はいいですか？';
+            progressBar.style.width = '0%';
+        }
+
+        function switchMode(mode) {
+            currentMode = mode;
+            body.className = MODES[mode].class;
+            
+            // タブのアクティブ表示切り替え
+            tabBtns.forEach((btn, index) => {
+                const modesKeys = Object.keys(MODES);
+                if (modesKeys[index] === mode) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            resetTimer();
+        }
+
+        function updateButtonState() {
+            if (isRunning) {
+                iconPlay.style.display = 'none';
+                iconPause.style.display = 'block';
+                mainBtnText.textContent = '一時停止';
+            } else {
+                iconPlay.style.display = 'block';
+                iconPause.style.display = 'none';
+                mainBtnText.textContent = '開始';
+            }
+        }
+
+        // --- 通知音 (Web Audio API) ---
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound() {
+            if (!audioCtx) initAudio();
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.5);
+            
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.5);
+        }
+
+        // --- 音量ボタン ---
+        const soundToggle = document.getElementById('soundToggle');
+        const iconVolOn = document.getElementById('icon-vol-on');
+        const iconVolOff = document.getElementById('icon-vol-off');
+
+        soundToggle.addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            if (soundEnabled) {
+                iconVolOn.style.display = 'block';
+                iconVolOff.style.display = 'none';
+                soundToggle.style.color = 'var(--gray-700)';
+            } else {
+                iconVolOn.style.display = 'none';
+                iconVolOff.style.display = 'block';
+                soundToggle.style.color = 'var(--gray-400)';
+            }
+        });
+
+        // --- タスク管理 ---
+        const taskForm = document.getElementById('taskForm');
+        const taskInput = document.getElementById('taskInput');
+        const taskList = document.getElementById('taskList');
+        const taskCount = document.getElementById('taskCount');
+
+        taskForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = taskInput.value.trim();
+            if (text) {
+                tasks.push({ id: Date.now(), text: text, completed: false });
+                taskInput.value = '';
+                renderTasks();
+            }
+        });
+
+        function renderTasks() {
+            taskList.innerHTML = '';
+            const activeCount = tasks.filter(t => !t.completed).length;
+            taskCount.textContent = activeCount;
+
+            tasks.forEach(task => {
+                const li = document.createElement('li');
+                li.className = `task-item ${task.completed ? 'completed' : ''}`;
+                li.innerHTML = `
+                    <div class="task-content">
+                        <button class="btn-check" onclick="toggleTask(${task.id})">
+                            <svg width="22" height="22" viewBox="0 0 24 24">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                        </button>
+                        <span class="task-text">${escapeHtml(task.text)}</span>
+                    </div>
+                    <button class="btn-delete" onclick="deleteTask(${task.id})">
+                        <svg width="18" height="18" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                `;
+                taskList.appendChild(li);
+            });
+        }
+
+        window.toggleTask = (id) => {
+            const task = tasks.find(t => t.id === id);
+            if (task) {
+                task.completed = !task.completed;
+                renderTasks();
+            }
+        };
+
+        window.deleteTask = (id) => {
+            tasks = tasks.filter(t => t.id !== id);
+            renderTasks();
+        };
+
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // 初期化
+        updateDisplay();
+    </script>
+</body>
+</html>
